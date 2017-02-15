@@ -61,16 +61,19 @@ func ExtractDockerAuth(data []byte, url string) (string,string,error) {
 	res := DockerAuth{}
 	err := json.Unmarshal(data,&res)
 	if err != nil{
+		log.Error("unable to decode config from json")
 		return "","",err
 	}
 	for host, auth := range res.Auths {
 		if strings.Contains(url,host){
 			decodedBytes,err := base64.StdEncoding.DecodeString(auth.Auth)
 			if err != nil{
+				log.Error("unable to decode auth as b64")
 				return "","",err
 			}
 			decodedStrings := strings.Split(string(decodedBytes),":")
 			if len(decodedStrings) != 2 {
+				log.Error("bad format of auth")
 				return "","",errors.New("bad format of auth")
 			}
 			return decodedStrings[0],decodedStrings[1],nil
@@ -82,6 +85,7 @@ func ExtractDockerAuth(data []byte, url string) (string,string,error) {
 func getDockerConfig() ([]byte , error) {
 	usr, err := user.Current()
 	if err != nil {
+		log.Error("user home not found")
 		return nil, err
 	}
 	return ioutil.ReadFile(usr.HomeDir+"/.docker/config.json")
@@ -90,6 +94,7 @@ func getDockerConfig() ([]byte , error) {
 func getDockerAuth(serverUrl string) (string, string, error) {
 	dat, err := getDockerConfig()
 	if err != nil {
+		log.Error("docker config not found")
 		return "", "", err
 	}
 	return ExtractDockerAuth(dat,serverUrl)
