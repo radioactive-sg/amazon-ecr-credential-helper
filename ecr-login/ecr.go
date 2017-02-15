@@ -19,14 +19,15 @@ import (
 	// "io/ioutil"
 	"regexp"
 
+	"encoding/base64"
+	"encoding/json"
+	"io/ioutil"
+	"os"
+	"strings"
+
 	"github.com/awslabs/amazon-ecr-credential-helper/ecr-login/api"
 	log "github.com/cihub/seelog"
 	"github.com/docker/docker-credential-helpers/credentials"
-	"encoding/json"
-	"encoding/base64"
-	"strings"
-	"io/ioutil"
-	"os/user"
 )
 
 const programName = "docker-credential-ecr-login"
@@ -53,42 +54,40 @@ type DockerAuthItem struct {
 }
 
 type DockerAuth struct {
-	Auths  map[string]DockerAuthItem
+	Auths map[string]DockerAuthItem
 }
 
-
-func ExtractDockerAuth(data []byte, url string) (string,string,error) {
+func ExtractDockerAuth(data []byte, url string) (string, string, error) {
 	res := DockerAuth{}
-	err := json.Unmarshal(data,&res)
-	if err != nil{
+	err := json.Unmarshal(data, &res)
+	if err != nil {
 		log.Error("unable to decode config from json")
-		return "","",err
+		return "", "", err
 	}
 	for host, auth := range res.Auths {
-		if strings.Contains(url,host){
-			decodedBytes,err := base64.StdEncoding.DecodeString(auth.Auth)
-			if err != nil{
+		if strings.Contains(url, host) {
+			decodedBytes, err := base64.StdEncoding.DecodeString(auth.Auth)
+			if err != nil {
 				log.Error("unable to decode auth as b64")
-				return "","",err
+				return "", "", err
 			}
-			decodedStrings := strings.Split(string(decodedBytes),":")
+			decodedStrings := strings.Split(string(decodedBytes), ":")
 			if len(decodedStrings) != 2 {
 				log.Error("bad format of auth")
-				return "","",errors.New("bad format of auth")
+				return "", "", errors.New("bad format of auth")
 			}
-			return decodedStrings[0],decodedStrings[1],nil
+			return decodedStrings[0], decodedStrings[1], nil
 		}
 	}
-	return "","",errors.New(url+" not found")
+	return "", "", errors.New(url + " not found")
 }
 
-func getDockerConfig() ([]byte , error) {
-	usr, err := user.Current()
-	if err != nil {
+func getDockerConfig() ([]byte, error) {
+	home := os.Getenv("HOME")
+	if home == "" {
 		log.Error("user home not found")
-		return nil, err
 	}
-	return ioutil.ReadFile(usr.HomeDir+"/.docker/config.json")
+	return ioutil.ReadFile(home + "/.docker/config.json")
 }
 
 func getDockerAuth(serverUrl string) (string, string, error) {
@@ -97,16 +96,15 @@ func getDockerAuth(serverUrl string) (string, string, error) {
 		log.Error("docker config not found")
 		return "", "", err
 	}
-	return ExtractDockerAuth(dat,serverUrl)
+	return ExtractDockerAuth(dat, serverUrl)
 }
 
 func (self ECRHelper) Get(serverURL string) (string, string, error) {
 	defer log.Flush()
-	user , pass , err := getDockerAuth(serverURL)
-	if err == nil{
+	user, pass, err := getDockerAuth(serverURL)
+	if err == nil {
 		return user, pass, err
 	}
-	
 
 	matches := ecrPattern.FindStringSubmatch(serverURL)
 	if len(matches) == 0 {

@@ -31,13 +31,12 @@ const (
 	expectedPassword = "password"
 )
 
-
-func TestGetDockerConfig(t *testing.T){
-	_,err := getDockerConfig()
-	assert.Nil(t,err)
+func TestGetDockerConfig(t *testing.T) {
+	_, err := getDockerConfig()
+	assert.Nil(t, err)
 }
 
-func TestDockerCreds(t *testing.T){
+func TestDockerCreds(t *testing.T) {
 	testCreds := `{
         "auths": {
                 "https://testrepo": {
@@ -49,12 +48,10 @@ func TestDockerCreds(t *testing.T){
         },
         "credsStore": "ecr-login"
 	}`
-	username,password,err := ExtractDockerAuth([]byte(testCreds),"https://testrepo/foobledoo")
-	assert.Equal(t,"testuser",username)
-	assert.Equal(t,"testpass",password)
-	assert.Nil(t,err)
-	
-
+	username, password, err := ExtractDockerAuth([]byte(testCreds), "https://testrepo/foobledoo")
+	assert.Equal(t, "testuser", username)
+	assert.Equal(t, "testpass", password)
+	assert.Nil(t, err)
 
 }
 
