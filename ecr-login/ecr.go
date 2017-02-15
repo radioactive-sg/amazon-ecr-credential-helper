@@ -14,12 +14,19 @@
 package ecr
 
 import (
+	// "encoding/json"
 	"errors"
+	// "io/ioutil"
 	"regexp"
 
 	"github.com/awslabs/amazon-ecr-credential-helper/ecr-login/api"
 	log "github.com/cihub/seelog"
 	"github.com/docker/docker-credential-helpers/credentials"
+	"encoding/json"
+	"encoding/base64"
+	"strings"
+	"io/ioutil"
+	"os/user"
 )
 
 const programName = "docker-credential-ecr-login"
@@ -41,8 +48,61 @@ func (ECRHelper) Delete(serverURL string) error {
 	return notImplemented
 }
 
+type DockerAuthItem struct {
+	Auth string
+}
+
+type DockerAuth struct {
+	Auths  map[string]DockerAuthItem
+}
+
+
+func ExtractDockerAuth(data []byte, url string) (string,string,error) {
+	res := DockerAuth{}
+	err := json.Unmarshal(data,&res)
+	if err != nil{
+		return "","",err
+	}
+	for host, auth := range res.Auths {
+		if strings.Contains(url,host){
+			decodedBytes,err := base64.StdEncoding.DecodeString(auth.Auth)
+			if err != nil{
+				return "","",err
+			}
+			decodedStrings := strings.Split(string(decodedBytes),":")
+			if len(decodedStrings) != 2 {
+				return "","",errors.New("bad format of auth")
+			}
+			return decodedStrings[0],decodedStrings[1],nil
+		}
+	}
+	return "","",errors.New(url+" not found")
+}
+
+func getDockerConfig() ([]byte , error) {
+	usr, err := user.Current()
+	if err != nil {
+		return nil, err
+	}
+	return ioutil.ReadFile(usr.HomeDir+"/.docker/config.json")
+}
+
+func getDockerAuth(serverUrl string) (string, string, error) {
+	dat, err := getDockerConfig()
+	if err != nil {
+		return "", "", err
+	}
+	return ExtractDockerAuth(dat,serverUrl)
+}
+
 func (self ECRHelper) Get(serverURL string) (string, string, error) {
 	defer log.Flush()
+	user , pass , err := getDockerAuth(serverURL)
+	if err == nil{
+		return user, pass, err
+	}
+	
+
 	matches := ecrPattern.FindStringSubmatch(serverURL)
 	if len(matches) == 0 {
 		log.Error(programName + " can only be used with Amazon EC2 Container Registry.")
@@ -56,7 +116,7 @@ func (self ECRHelper) Get(serverURL string) (string, string, error) {
 	region := matches[2]
 	log.Debugf("Retrieving credentials for %s in %s (%s)", registry, region, serverURL)
 	client := self.ClientFactory.NewClient(region)
-	user, pass, err := client.GetCredentials(registry, serverURL)
+	user, pass, err = client.GetCredentials(registry, serverURL)
 	if err != nil {
 		log.Errorf("Error retrieving credentials: %v", err)
 		return "", "", credentials.ErrCredentialsNotFound

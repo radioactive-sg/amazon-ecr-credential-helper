@@ -31,6 +31,33 @@ const (
 	expectedPassword = "password"
 )
 
+
+func TestGetDockerConfig(t *testing.T){
+	_,err := getDockerConfig()
+	assert.Nil(t,err)
+}
+
+func TestDockerCreds(t *testing.T){
+	testCreds := `{
+        "auths": {
+                "https://testrepo": {
+                        "auth": "dGVzdHVzZXI6dGVzdHBhc3M="
+                }
+        },
+        "HttpHeaders": {
+                "User-Agent": "Docker-Client/1.12.3 (linux)"
+        },
+        "credsStore": "ecr-login"
+	}`
+	username,password,err := ExtractDockerAuth([]byte(testCreds),"https://testrepo/foobledoo")
+	assert.Equal(t,"testuser",username)
+	assert.Equal(t,"testpass",password)
+	assert.Nil(t,err)
+	
+
+
+}
+
 func TestGetSuccess(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
